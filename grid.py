@@ -90,13 +90,17 @@ class CellGrid(tk.Canvas):
             cell.draw()
             self.switched.append(cell)
 
+class Grid:
+    def __init__(self, parent, rowNumber, columnNumber, cellSize, *args, **kwargs):
+        self.parent = parent
+
+        self.CanvasGrid = tk.Canvas(self.parent, width=cellSize*columnNumber, height=cellSize*rowNumber, *args, **kwargs)
+        self.Buttons = tk.Button(self.parent)
+
+
 if __name__ == "__main__":
     app = tk.Tk()
 
-    grid = CellGrid(app, 20, 20, 30)
-    grid.pack()
+    grid = Grid(app, 20, 20, 30)
 
     app.mainloop()
-
-
-
