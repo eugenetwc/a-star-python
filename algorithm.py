@@ -2,17 +2,40 @@
 #https://www.geeksforgeeks.org/a-search-algorithm/
 import numpy as np
 import math
+from scipy.spatial.distance import cdist
+from queue import PriorityQueue
 
 class Node():
     """A node class for A* Search Algorithm"""
 
     def __init__(self, parent=None, position=None):
         self.parent = parent
+        # self.position is an np.ndarray
         self.position = position
 
         self.g = 0
         self.h = 0
         self.f = 0
+
+    def __eq__(self, other):
+        # check if two numpy arrays are equal
+        comparison = self.position == other.position
+        equal_arrays = comparison.all()
+        return equal_arrays
+    
+    def __repr__(self):
+        return f"{self.position} - g: {self.g} h: {self.h} f: {self.f}"
+    
+    # defining less than for purposes of priority queue
+    def __lt__(self, other):
+        return self.f < other.f
+
+    # defining greater than for purposes of priority queue
+    def __gt__(self, other):
+        return self.f > other.f
+
+    def __hash__(self):
+        return hash(self.position)
 
 def find_coords(_list, val):
     for i, sub_list in enumerate(_list):
@@ -34,30 +57,26 @@ def distance(start, end, heuristics='manhattan'):
 
     return distance
 
-def a_star(coord_map: list):
-    start = find_coords(coord_map, 2)
-    end = find_coords(coord_map, 3)
+def a_star(coord_map):
+    coord_map = np.asarray(coord_map)
+    # find point where coord_map == 2 (start point)
+    start = np.argwhere(coord_map == 2).reshape(2)
+    # find point where coord_map == 3 (end point)
+    end = np.argwhere(coord_map == 3).reshape(2)
 
     start_node = Node(None, start)
     start_node.g = start_node.h = start_node.f = 0 
     end_node = Node(None, end)
     end_node.g = end_node.h = end_node.f = 0
 
-    open_list = []
+    open_list = PriorityQueue()
     closed_list = []
 
-    open_list.append(start_node)
+    open_list.put(start_node)
 
-    while len(open_list) > 0:
+    while not open_list.empty():
 
-        current_node = open_list[0]
-        current_index = 0
-        for index, item in enumerate(open_list):
-            if item.f < current_node.f:
-                current_node = item
-                current_index = index
-
-        open_list.pop(current_index)
+        current_node = open_list.get()
         closed_list.append(current_node)
 
         if current_node == end_node:
@@ -66,52 +85,53 @@ def a_star(coord_map: list):
             while current is not None:
                 path.append(current.position)
                 current = current.parent
-            return path[::-1] # Return reversed path
+            return np.asarray(path[::-1]) # Return reversed path
 
-        successors = []
         # ONLY FOR MANHATTAN DISTANCE
-        successor_positions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
+        successors = []
+        successor_positions = np.array([(0, 1), (1, 0), (0, -1), (-1, 0)])
         for new_position in successor_positions:
 
             # Get node position
-            node_position = (current_node.position[0]+new_position[0], current_node.position[1]+new_position[1])
+            node_position = current_node.position + new_position
 
             # Make sure within range
-            if (node_position[0] > (len(coord_map)-1)) or (node_position[0] < 0) or (node_position[1] > (len(coord_map[0])-1)) or (node_position[1] < 0):
+            if (node_position[0] >= coord_map.shape[0]) or (node_position[0] < 0) or (node_position[1] >= coord_map.shape[1]) or (node_position[1] < 0):
                 continue
 
             # Make sure walkable terrain
-            if coord_map[node_position[0]][node_position[1]] != 0:
+            if coord_map[node_position[0], node_position[1]] == 1:
                 continue
 
             # Create new node
             new_node = Node(current_node, node_position)
-            print(new_node.position)
 
             # Append
             successors.append(new_node)
 
+
         for successor in successors:
-            for x in closed_list:
-                if successor == x:
-                    continue
+            if successor in closed_list:
+                continue
             
-            successor.g = current_node.g + 1
-            successor.h = distance(successor.position, end_node.position)
-            successor.f = successor.g + successor.h
+            successor_current_cost = current_node.g + 1
+            # cityblock == manhattan distance
+            if (successor_current_cost < successor.g) or (successor not in open_list.queue):
+                successor.g = successor_current_cost
+                successor.h = cdist(successor.position.reshape([1, 2]), end_node.position.reshape([1, 2]), 'cityblock').item()
+                successor.f = successor.g + successor.h
 
-            for open_node in open_list:
-                if successor == open_node and successor.g > open_node.g:
-                    continue
+                if successor not in open_list.queue:
+                    open_list.put(successor)
 
-            open_list.append(successor)
 
-maze = [
-    [0, 0, 0, 0, 2],
-    [0, 0, 1, 0, 0],
-    [0, 3, 0, 0, 0],
-    [0, 0, 0, 0, 0]
-]
+if __name__ == "__main__":
+    maze = [
+        [0, 0, 1, 0, 0],
+        [0, 0, 1, 0, 2],
+        [0, 3, 1, 0, 0],
+        [0, 0, 0, 0, 0]
+    ]
 
-path = a_star(maze)
-print(path)
+    path = a_star(maze)
+    print(path)

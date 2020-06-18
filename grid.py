@@ -2,6 +2,8 @@
 import tkinter as tk
 import numpy as np
 
+import algorithm
+
 class Cell:
     COLORS = {
             0: 'white',    # untried
@@ -60,6 +62,14 @@ class CellGrid(tk.Canvas):
             for cell in row:
                 cell.draw()
 
+    def autodraw(self, row, column):
+        cell = self._grid[row][column]
+        cell.setValue(self.current_value)
+        cell.draw()
+        #add the cell to the list of cell switched during the click
+        self.switched.append(cell)
+        self.coord_map[row, column] = self.current_value
+
     def bind_mouse(self):
         #bind click action
         self.bind("<Button-1>", self.handleMouseClick)
@@ -95,12 +105,7 @@ class CellGrid(tk.Canvas):
     
     def handleMouseClick(self, event):
         row, column = self._eventCoords(event)
-        cell = self._grid[row][column]
-        cell.setValue(self.current_value)
-        cell.draw()
-        #add the cell to the list of cell switched during the click
-        self.switched.append(cell)
-        self.coord_map[row, column] = self.current_value
+        self.autodraw(row, column)
 
     def handleMouseMotion(self, event):
         row, column = self._eventCoords(event)
@@ -135,7 +140,14 @@ class InteractiveGrid:
         self.clear_button.grid(row=1, column=4, sticky='E')
 
     def solveCallBack(self):
-        pass
+        coord_map = self.cellgrid.getMap().tolist()
+        path = algorithm.a_star(coord_map)
+
+        self.cellgrid.setCurrentValue(6)
+        for row, column in path:
+            # print(row, column)
+            self.cellgrid.autodraw(row, column)
+        # print(path)
 
     def obstaclesCallBack(self):
         self.cellgrid.bind_mouse()
