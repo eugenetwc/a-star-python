@@ -2,6 +2,7 @@
 #https://www.geeksforgeeks.org/a-search-algorithm/
 import numpy as np
 import math
+import time
 from scipy.spatial.distance import cdist
 from queue import PriorityQueue
 
@@ -19,7 +20,7 @@ class Node():
 
     def __eq__(self, other):
         # check if two numpy arrays are equal
-        comparison = self.position == other.position
+        comparison = self.position == other
         equal_arrays = comparison.all()
         return equal_arrays
     
@@ -57,6 +58,16 @@ def distance(start, end, heuristics='manhattan'):
 
     return distance
 
+def get_neighbours(node, coordMap):
+    mapSize = coordMap.shape
+    x, y = node.position
+    positions = np.array([(x, y), (x+1, y), (x-1, y), (x, y+1), (x, y-1)])
+    filter = (positions[:, 0] >= 0) & (positions[:, 0] < mapSize[0]) & (positions[:, 1] >= 0) & (positions[:, 1] < mapSize[1])
+    positions = positions[filter]
+    positions = positions[coordMap[positions[:, 0], positions[:, 1]] != 1]
+    return positions
+
+
 def a_star(coord_map):
     coord_map = np.asarray(coord_map)
     # find point where coord_map == 2 (start point)
@@ -66,8 +77,6 @@ def a_star(coord_map):
 
     start_node = Node(None, start)
     start_node.g = start_node.h = start_node.f = 0 
-    end_node = Node(None, end)
-    end_node.g = end_node.h = end_node.f = 0
 
     open_list = PriorityQueue()
     closed_list = []
@@ -79,7 +88,7 @@ def a_star(coord_map):
         current_node = open_list.get()
         closed_list.append(current_node)
 
-        if current_node == end_node:
+        if current_node == end:
             path = []
             current = current_node
             while current is not None:
@@ -87,51 +96,53 @@ def a_star(coord_map):
                 current = current.parent
             return np.asarray(path[::-1]) # Return reversed path
 
-        # ONLY FOR MANHATTAN DISTANCE
-        successors = []
-        successor_positions = np.array([(0, 1), (1, 0), (0, -1), (-1, 0)])
-        for new_position in successor_positions:
+        successor_positions = get_neighbours(current_node, coord_map)
+        for pos in successor_positions:
+            tentativeGScore = current_node.g + 1
 
-            # Get node position
-            node_position = current_node.position + new_position
-
-            # Make sure within range
-            if (node_position[0] >= coord_map.shape[0]) or (node_position[0] < 0) or (node_position[1] >= coord_map.shape[1]) or (node_position[1] < 0):
+            openVisited = False
+            for i, openNode in enumerate(open_list.queue):
+                if openNode == pos:
+                    if openNode.g <= tentativeGScore:
+                        openVisited = True
+                        break
+                    else:
+                        open_list.pop(i)
+                        break
+            if openVisited:
                 continue
 
-            # Make sure walkable terrain
-            if coord_map[node_position[0], node_position[1]] == 1:
+            closedVisited = False
+            for i, closedNode in enumerate(closed_list):
+                if closedNode == pos:
+                    if closedNode.g <= tentativeGScore:
+                        closedVisited = True
+                        break
+                    else:
+                        closed_list.pop(i)
+                        break
+            if closedVisited:
                 continue
 
-            # Create new node
-            new_node = Node(current_node, node_position)
+            newNode = Node(parent=current_node, position=pos)
+            newNode.g = tentativeGScore
+            newNode.h = int(cdist(pos.reshape(1, -1), end.reshape(1, -1), metric='cityblock'))
+            newNode.f = newNode.g + newNode.h
 
-            # Append
-            successors.append(new_node)
-
-
-        for successor in successors:
-            if successor in closed_list:
-                continue
-            
-            successor_current_cost = current_node.g + 1
-            # cityblock == manhattan distance
-            if (successor_current_cost < successor.g) or (successor not in open_list.queue):
-                successor.g = successor_current_cost
-                successor.h = cdist(successor.position.reshape([1, 2]), end_node.position.reshape([1, 2]), 'cityblock').item()
-                successor.f = successor.g + successor.h
-
-                if successor not in open_list.queue:
-                    open_list.put(successor)
-
+            open_list.put(newNode)
 
 if __name__ == "__main__":
     maze = [
-        [0, 0, 1, 0, 0],
-        [0, 0, 1, 0, 2],
-        [0, 3, 1, 0, 0],
-        [0, 0, 0, 0, 0]
+        [0, 0, 1, 0, 3, 0],
+		[0, 0, 0, 1, 0, 0],
+		[1, 1, 0, 1, 1, 0],
+		[2, 0, 0, 0, 0, 0],
     ]
 
+    path = None
+    start = time.time()
+    # for i in range(1000):
     path = a_star(maze)
-    print(path)
+    elapsed = time.time() - start
+    print("solution:", path)
+    print("time elapsed:", elapsed)
